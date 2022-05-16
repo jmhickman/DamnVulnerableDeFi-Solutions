@@ -40,3 +40,11 @@ contract TrusterLenderPool is ReentrancyGuard {
     }
 
 }
+
+/*
+This was susceptable to (what I would have called in 'trad infosec') an "impersonation attack." Setting the `target` value 
+to this contract is enough to perform any action as it (since it's a call). So the actual flash loan itself is immaterial
+to the exploit. All that is done is use the impersonation to approve the attacking contract as a spender of the token.
+Then the attacker just transfers out the tokens after the loan resolves.
+
+*/
