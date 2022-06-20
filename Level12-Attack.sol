@@ -22,9 +22,8 @@ of an 'operation' at a given block timestamp. The sense of the comparison operat
 inverted, perhaps because at one time the order of the comparison was reversed. As
 written, the expression will evaluate to true when the block timestamp has not exceeded
 the desired time of operation. Once the default timelock span (one hour) is passed, the 
-block timestamp will evaluate to false, and the logic will fall through to the mere 
-existence check of the desired timestamp. The operation will be permanently hung at 
-'Scheduled'.
+comparison will evaluate to false. The logic will then fall through to the non-0 
+check of the desired timestamp. The operation will be permanently hung at 'Scheduled'.
 
 Bypassing the timelock itself is moderate in severity. 
 
@@ -51,28 +50,36 @@ function execute(
 }
 
 The primary issue here is the combination of allowing any address to call the 
-execution of an operation, with the incorrect ordering of the checks and interactions 
-inside the function.
+function (no onlyOwner modifier or similar), with the incorrect ordering of 
+the checks and interactions inside the function.
 
 The intention is that, since only the trusted PROPOSER role is able to add 
-operations to the queue, it is a convenience that any address may invoke the execution.
+operations to the queue, it shouldn't matter who calls `execute` in the end.
 
-However, requested calls are made before any check that they are ready for execution. 
-The intended logic for the timelock is broken (as noted above) but the calls will still 
-fail because the operation was never initialized. The call to `getOperationState` 
-will return the enum Unknown, which still fails the check.
+The `execute` function actually executes the requested operation(s) no matter what (line 45 above)
+however, and only reverts any effects if the final check on `getOperationState` fails. (line 48)
+Operations are initialized with the OperationState enum set to Unknown (0). So by default,
+an attacker would be stymied because the operations submitted will fail the check for
+ReadyForExecution.
 
-The solution is to schedule two operations. The first operation uses the `grantRole`
-call to set the attacker's contract as a PROPOSER. The second call is to a function
-at attacker-controlled address that calls the `schedule` function. Since, at this 
-point in the execution, the attacker contract is a PROPOSER, the check in `schedule`
-will pass. Execution in `schedule` resolves, and thus the final timelock check will
-pass (for the reason outlined above: the incorrect timestamp check).
+However, because all submitted operations are executed before this crucial check, an 
+attacker has margin to exploit the logic further. Specifically, any state change will be
+valid until the entire call reverts. Up to 255 operations can be submitted in one transaction 
+(`uint8 i = 0`). As long as any given set of operations can be submitted via `schedule` 
+successfully before the check on OperationState is performed, the whole batch will succeed.
 
-At this point, the attacker contract has elevated permissions. These are abused in 
-this contract example by performing a malicious ClimberVault upgrade which has 
-removed a security modifer from the `sweepFunds()` function. This allows anyone to
-call `sweepFunds()`, stealing all ERC-20 tokens from the contract.
+The contract below exploits this. It first submits a pair of operations in one call to
+`execute`. The first uses the Timelock contract's `grantRole` function to give itself
+the PROPOSER role. It then calls itself (via `resolveCallOne`) to schedule the pair of
+operations that are currently executing. This will succeed because at this point in execution,
+the contract holds the PROPOSER role. Once the `schedule` function returns, the whole
+stack unwinds and the operations will pass the `OperationState` check (and the invalid
+timelock logic will kick in, allowing immediate execution)
+
+Now that the PROPOSER role is permanently held by the contract, a second call is made to 
+`schedule` in order to create a malicious upgrade of the ClimberVault contract. The vault
+is subverted to remove a critical modifier on the `sweepFunds()` function, allowing anyone
+to remove all ERC-20 tokens from the vault.
 
 */
 
