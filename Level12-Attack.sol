@@ -21,9 +21,10 @@ The `getOperationState()` function contains erroneous logic to check for the rea
 of an 'operation' at a given block timestamp. The sense of the comparison operator is
 inverted, perhaps because at one time the order of the comparison was reversed. As
 written, the expression will evaluate to true when the block timestamp has not exceeded
-the desired time of operation. Once the default hour is passed, the block timestamp 
-will evaluate to false, and the logic will fall through to the mere existence check of
-the desired timestamp. The operation will be permanently hung at 'Scheduled'.
+the desired time of operation. Once the default timelock span (one hour) is passed, the 
+block timestamp will evaluate to false, and the logic will fall through to the mere 
+existence check of the desired timestamp. The operation will be permanently hung at 
+'Scheduled'.
 
 Bypassing the timelock itself is moderate in severity. 
 
