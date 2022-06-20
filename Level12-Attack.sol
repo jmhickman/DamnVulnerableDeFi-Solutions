@@ -56,32 +56,35 @@ the checks and interactions inside the function.
 The intention is that, since only the trusted PROPOSER role is able to add 
 operations to the queue, it shouldn't matter who calls `execute` in the end.
 
-The `execute` function actually executes the requested operation(s) no matter what (line 45 above)
-however, and only reverts any effects if the final check on `getOperationState` fails. (line 48)
-Operations are initialized with the OperationState enum set to Unknown (0). So by default,
-an attacker would be stymied because the operations submitted will fail the check for
+The `execute` function actually executes the requested operation(s) no matter 
+what (line 45 above) however, and only reverts any effects if the final check 
+on `getOperationState` fails. (line 48) Operations are initialized with the 
+OperationState enum set to Unknown (0). So by default, an attacker would be 
+stymied because the operations submitted will fail the check for 
 ReadyForExecution.
 
-However, because all submitted operations are executed before this crucial check, an 
-attacker has margin to exploit the logic further. Specifically, any state change will be
-valid until the entire call reverts. Up to 255 operations can be submitted in one transaction 
-(`uint8 i = 0`). As long as any given set of operations can be submitted via `schedule` 
-successfully before the check on OperationState is performed, the whole batch will succeed.
+However, because all submitted operations are executed before this crucial 
+check, an attacker has margin to exploit the logic further. Specifically, any 
+state change will be valid until the entire call reverts. Up to 255 operations 
+can be submitted in one transaction (`uint8 i = 0`). As long as any given set 
+of operations can be submitted via `schedule` successfully before the check on
+OperationState is performed, the whole batch will succeed.
 
-The contract below exploits this. It first submits a pair of operations in one call to
-`execute`. The first uses the Timelock contract's `grantRole` function to give itself
-the PROPOSER role. It then calls itself (via `resolveCallOne`) to schedule the pair of
-operations that are currently executing. This will succeed because at this point in execution,
-the contract holds the PROPOSER role. Once the `schedule` function returns, the whole
-stack unwinds and the operations will pass the `OperationState` check (and the invalid
-timelock logic will kick in, allowing immediate execution)
+The contract below exploits this. It first submits a pair of operations in one 
+call to `execute`. The first uses the Timelock contract's `grantRole` function 
+to give itself the PROPOSER role. It then calls itself (via `resolveCallOne`) 
+to schedule the pair of operations that are currently executing. This will 
+succeed because at this point in execution, the contract holds the PROPOSER 
+role. Once the `schedule` function returns, the whole stack unwinds and the 
+operations will pass the `OperationState` check (and the invalid timelock logic
+ will kick in, allowing immediate execution).
 
-Now that the PROPOSER role is permanently held by the contract, a second call is made to 
-`schedule` in order to create a malicious upgrade of the ClimberVault contract. The vault
-is subverted to remove a critical modifier on the `sweepFunds()` function, allowing anyone
-to remove all ERC-20 tokens from the vault.
-
-*/
+Now that the PROPOSER role is permanently held by the contract, a second call 
+is made to `schedule` in order to create a malicious upgrade of the 
+ClimberVault contract. The vault is subverted to remove a critical modifier on
+the `sweepFunds()` function, allowing anyone to remove all ERC-20 tokens from 
+the vault.
+ */
 
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
@@ -119,8 +122,6 @@ contract VaultBreaker {
     function callOne(address _target) external {
         // We do this here so that it can be reused during resolveCallOne
         target = _target;
-        
-        //repetitive but it works. Init and set target and data array values
         
         address[] memory targets = new address[](2);
         uint256[] memory values = new uint256[](2);
@@ -169,5 +170,3 @@ contract VaultBreaker {
         require(success2, string(_msg2));
     }
 }
-
-// ClimberVault was modified with the modifier `onlySweeper` removed from `sweepFunds()`, and the target of the sweep set to `msg.sender`
