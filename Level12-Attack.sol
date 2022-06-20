@@ -1,3 +1,82 @@
+/**
+This contract exploits a pair of flaws in the ClimberTimelock contract logic.
+
+Relevant function:
+
+function getOperationState(bytes32 id) public view returns (OperationState) {
+    Operation memory op = operations[id];
+
+    if(op.executed) {
+        return OperationState.Executed;
+    } else if(op.readyAtTimestamp >= block.timestamp) { 
+        return OperationState.ReadyForExecution;
+    } else if(op.readyAtTimestamp > 0) {  
+        return OperationState.Scheduled;
+    } else {
+        return OperationState.Unknown;
+    }
+}
+
+The `getOperationState()` function contains erroneus logic to check for the readiness 
+of an 'operation' at a given block timestamp. The sense of the comparison operator is
+inverted, perhaps because at one time the order of the comparison was reversed. As
+written, the expression will evaluate to true when the block timestamp has not exceeded
+the desired time of operation. Once the default hour is passed, the block timestamp 
+will evaluate to false, and the logic will fall through to the mere existence check of
+the desired timestamp. The operation will be permanently hung at 'Scheduled'.
+
+Bypassing the timelock itself is moderate in severity. 
+
+The second flaw is in the execution of scheduled events.
+
+function execute(
+    address[] calldata targets,
+    uint256[] calldata values,
+    bytes[] calldata dataElements,
+    bytes32 salt
+) external payable {
+    require(targets.length > 0, "Must provide at least one target");
+    require(targets.length == values.length);
+    require(targets.length == dataElements.length);
+
+    bytes32 id = getOperationId(targets, values, dataElements, salt);
+
+    for (uint8 i = 0; i < targets.length; i++) {
+        targets[i].functionCallWithValue(dataElements[i], values[i]);
+    }
+
+    require(getOperationState(id) == OperationState.ReadyForExecution);
+    operations[id].executed = true;
+}
+
+The primary issue here is the combination of allowing any address to call
+the execution of an operation, with the incorrect ordering of the checks
+and interactions inside the function.
+
+The intention is that, since only the trusted PROPOSER role is able to 
+add operations to the queue, it is a matter on convenience that any address
+may invoke the execution.
+
+However, requested calls are made before any check that they are ready for
+execution. The intended logic for the timelock is broken (as noted above) 
+but the calls will still fail because the operation was never initialized. 
+The call to `getOperationState` will return the enum Unknown, which still
+fails the check.
+
+The solution is to schedule two operations. The first operation uses the `grantRole`
+call to set the attacker's contract as a PROPOSER. The second call is to a function
+at attacker-controlled address that calls the `schedule` function. Since, at this 
+point in the execution, the attacker contract is a PROPOSER, the check in `schedule`
+will pass. Execution in `schedule` resolves, and thus the final timelock check will
+pass (for the reason outlined above: the incorrect timestamp check).
+
+At this point, the attacker contract has elevated permissions. These are abused in 
+this contract example by performing a malicious ClimberVault upgrade which has 
+removed a security modifer from the `sweepFunds()` function. This allows anyone to
+call `sweepFunds()`, stealing all ERC-20 tokens from the contract.
+
+*/
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
