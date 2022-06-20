@@ -17,13 +17,18 @@ function getOperationState(bytes32 id) public view returns (OperationState) {
     }
 }
 
-The `getOperationState()` function contains erroneous logic to check for the readiness 
-of an 'operation' at a given block timestamp. The sense of the comparison operator is
-inverted, perhaps because at one time the order of the comparison was reversed. As
-written, the expression will evaluate to true when the block timestamp has not exceeded
-the desired time of operation. Once the default timelock span (one hour) is passed, the 
-comparison will evaluate to false. The logic will then fall through to the non-0 
-check of the desired timestamp. The operation will be permanently hung at 'Scheduled'.
+This function is intended to provde the 'timelock' functionality of the 
+contract. The intention is that a scheduled job (Operation) must sit in the
+queue for 1 hour before execution. 
+
+The `getOperationState()` function contains erroneous logic to check for the 
+readiness of an 'operation' at a given block timestamp. (line 11 above) The 
+sense of the comparison operator is inverted, perhaps because at one time the
+order of the comparison was reversed. As written, the expression will evaluate 
+to true when the block timestamp has not exceeded the desired time of 
+operation. Once the default timelock span (one hour) is passed, the comparison
+will evaluate to false. The logic will then fall through to the non-0 check of
+the desired timestamp. The operation will be permanently hung at 'Scheduled'.
 
 Bypassing the timelock itself is moderate in severity. 
 
@@ -61,7 +66,7 @@ what (line 45 above) however, and only reverts any effects if the final check
 on `getOperationState` fails. (line 48) Operations are initialized with the 
 OperationState enum set to Unknown (0). So by default, an attacker would be 
 stymied because the operations submitted will fail the check for 
-ReadyForExecution.
+ReadyForExecution (just not in the intended way).
 
 However, because all submitted operations are executed before this crucial 
 check, an attacker has margin to exploit the logic further. Specifically, any 
