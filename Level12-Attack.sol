@@ -17,7 +17,7 @@ function getOperationState(bytes32 id) public view returns (OperationState) {
     }
 }
 
-The `getOperationState()` function contains erroneus logic to check for the readiness 
+The `getOperationState()` function contains erroneous logic to check for the readiness 
 of an 'operation' at a given block timestamp. The sense of the comparison operator is
 inverted, perhaps because at one time the order of the comparison was reversed. As
 written, the expression will evaluate to true when the block timestamp has not exceeded
