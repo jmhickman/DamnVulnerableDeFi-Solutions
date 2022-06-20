@@ -50,19 +50,17 @@ function execute(
     operations[id].executed = true;
 }
 
-The primary issue here is the combination of allowing any address to call
-the execution of an operation, with the incorrect ordering of the checks
-and interactions inside the function.
+The primary issue here is the combination of allowing any address to call the 
+execution of an operation, with the incorrect ordering of the checks and interactions 
+inside the function.
 
-The intention is that, since only the trusted PROPOSER role is able to 
-add operations to the queue, it is a matter on convenience that any address
-may invoke the execution.
+The intention is that, since only the trusted PROPOSER role is able to add 
+operations to the queue, it is a convenience that any address may invoke the execution.
 
-However, requested calls are made before any check that they are ready for
-execution. The intended logic for the timelock is broken (as noted above) 
-but the calls will still fail because the operation was never initialized. 
-The call to `getOperationState` will return the enum Unknown, which still
-fails the check.
+However, requested calls are made before any check that they are ready for execution. 
+The intended logic for the timelock is broken (as noted above) but the calls will still 
+fail because the operation was never initialized. The call to `getOperationState` 
+will return the enum Unknown, which still fails the check.
 
 The solution is to schedule two operations. The first operation uses the `grantRole`
 call to set the attacker's contract as a PROPOSER. The second call is to a function
